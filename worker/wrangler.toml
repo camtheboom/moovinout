@@ -1,0 +1,27 @@
+name = "moovin-api"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# Origins allowed to call this endpoint — comma separated, no trailing slash,
+# e.g. "https://moovin.pages.dev,http://localhost:8000".
+# Leaving it empty allows any origin, which is fine locally but not in production.
+[vars]
+ALLOWED_ORIGINS = ""
+
+# Shared isochrone cache — the thing that keeps a shared key affordable.
+# Create the namespace once with:
+#   npx wrangler kv namespace create ISO_CACHE
+# then paste the printed id below.
+[[kv_namespaces]]
+binding = "ISO_CACHE"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# Applied to cache misses only — hits are free, so they aren't metered.
+[[ratelimits]]
+name = "MISS_LIMIT"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+# GEOAPIFY_KEY is a secret, never a var. Set it with:
+#   npx wrangler secret put GEOAPIFY_KEY
+# For local dev, put it in worker/.dev.vars (gitignored).

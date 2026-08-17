@@ -1,0 +1,13 @@
+{
+  "name": "moovin-api",
+  "private": true,
+  "description": "Isochrone proxy for Moovin — keeps the provider key server-side and caches aggressively.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

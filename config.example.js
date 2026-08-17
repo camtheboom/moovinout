@@ -7,6 +7,11 @@
 // instead.
 
 const MOOVIN_CONFIG = {
+  // Isochrone proxy (worker/) — overrides DEFAULT_API_BASE in index.html for
+  // local testing, e.g. "http://127.0.0.1:8787". Not a secret: the deployed
+  // value belongs in index.html so it ships with the site.
+  apiBase: "",
+
   // Geoapify — free, signs up with just an email at https://myprojects.geoapify.com/
   geoapifyKey: "",
 
