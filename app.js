@@ -11,7 +11,6 @@ const BAKED_GEOAPIFY_KEY = CFG.geoapifyKey || "";
 const DEFAULT_API_BASE = "";                       // e.g. "https://moovin-api.you.workers.dev"
 const API_BASE = String(CFG.apiBase || DEFAULT_API_BASE).trim().replace(/\/+$/, "");
 
-const DEFAULT_DEST = {name:"Sydney CBD (Town Hall)", lat:-33.8734, lon:151.2070};
 const BANDS = [
   {max:10, color:"#1a9850"},
   {max:20, color:"#f59e0b"},
@@ -33,14 +32,20 @@ let creds = {
     : ((BAKED_APP_ID && BAKED_API_KEY) ? "traveltime" : "geoapify"),
   appId: BAKED_APP_ID, apiKey: BAKED_API_KEY, gaKey: BAKED_GEOAPIFY_KEY
 };
-let dest = {...DEFAULT_DEST};
+// Active city. Everything that used to be a Sydney constant is read off this, so the
+// only Sydney-specific thing left in this file is that Sydney happens to be first in
+// the registry.
+let city = DEFAULT_CITY;
+let stations = city.stations();
+let dest = {...city.cbd};
 let maxMin = 30;
 let picking = false;
 let liveMode = false;           // true once API works
 const isoCache = new Map();     // key -> {shapes, ts}; see the isochrone cache section
 
 // ======================= map =======================
-const map = L.map("map", {zoomControl:false, preferCanvas:true}).setView([-33.8730, 151.2069], 12);
+const map = L.map("map", {zoomControl:false, preferCanvas:true})
+  .setView([city.view.lat, city.view.lon], city.view.zoom);
 // ======================= recenter control =======================
 // Declared up here because onAdd runs during addControl, below.
 let recenterBtn = null;
@@ -395,7 +400,7 @@ async function refreshLive(){
 // ======================= built-in fallback =======================
 function stationTimeTo(s){
   // station time to custom destination: time to CBD + estimated hop from CBD to dest (crow-fly at 30km/h PT)
-  const dCbd = haversine(dest.lat, dest.lon, DEFAULT_DEST.lat, DEFAULT_DEST.lon);
+  const dCbd = haversine(dest.lat, dest.lon, city.cbd.lat, city.cbd.lon);
   if(dCbd < 1200) return s.t;
   const hop = Math.round(dCbd / 500); // ~30 km/h
   return s.t + hop;
@@ -415,7 +420,7 @@ function popupHtml(s){
 }
 function renderStations(){
   stationLayer.clearLayers();
-  const sorted = [...STATIONS].map(s => ({...s, tt: stationTimeTo(s)})).sort((a,b) => b.tt - a.tt);
+  const sorted = [...stations].map(s => ({...s, tt: stationTimeTo(s)})).sort((a,b) => b.tt - a.tt);
   for(const s of sorted){
     if(s.tt > maxMin) continue;
     const b = bandOf(s.tt);
@@ -462,7 +467,7 @@ function persistSaved(){
 // current destination too.
 function estimateAt(lat, lon){
   let best = null, bestTotal = Infinity;
-  for(const s of STATIONS){
+  for(const s of stations){
     const d = haversine(lat, lon, s.lat, s.lon);
     if(d > 2500) continue;
     const total = stationTimeTo(s) + d / WALK_M_PER_MIN;
@@ -630,6 +635,55 @@ function setLiveMode(on){
   }
 }
 
+// ======================= city =======================
+// The state half of a city switch, with no rendering. Split out because the picker and
+// an incoming shared link both need it but re-render on different schedules — the link
+// applies a destination on top of this, and boot renders once at the end either way.
+function applyCity(next){
+  city = next;
+  stations = city.stations();
+  dest = {...city.cbd};
+  destMarker.setLatLng([dest.lat, dest.lon]);
+  document.getElementById("destName").textContent = dest.name;
+  const sel = document.getElementById("citySel");
+  if(sel) sel.value = city.id;
+  map.setView([city.view.lat, city.view.lon], city.view.zoom);
+}
+
+// Switching city is a bigger move than switching destination: the station dataset, the
+// CBD the built-in times are measured to, and the framing all change together. The
+// destination resets to the new city's CBD rather than being carried across, because a
+// Sydney address is not a meaningful destination on a Melbourne map.
+function setCity(id){
+  const next = cityById(id);
+  if(!next || next === city) return;
+  map.closePopup();
+  applyCity(next);
+  renderStations();
+  renderSaved();
+  refreshLive();
+  // rentals.js defines this when it's loaded; typeof so app.js doesn't depend on it.
+  if(typeof onCityChanged === "function") onCityChanged(city);
+  syncShareUrl();
+}
+
+function renderCityPicker(){
+  const sel = document.getElementById("citySel");
+  sel.innerHTML = "";
+  for(const c of CITIES){
+    const o = document.createElement("option");
+    o.value = c.id;
+    o.textContent = c.name;
+    sel.appendChild(o);
+  }
+  sel.value = city.id;
+  // One city is not a choice. Hidden rather than disabled so a single-city build looks
+  // exactly like it did before there was a registry at all.
+  document.getElementById("citySection").style.display = CITIES.length > 1 ? "" : "none";
+}
+
+document.getElementById("citySel").addEventListener("change", e => setCity(e.target.value));
+
 // ======================= destination =======================
 function setDestination(lat, lon, name){
   dest = {lat, lon, name: name || (lat.toFixed(3) + ", " + lon.toFixed(3))};
@@ -690,7 +744,7 @@ searchEl.addEventListener("input", () => {
   const q = searchEl.value.trim().toLowerCase();
   suggestEl.innerHTML = "";
   if(q.length < 2){ suggestEl.style.display = "none"; return; }
-  const hits = STATIONS.filter(s => s.n.toLowerCase().includes(q)).sort((a,b) => a.t - b.t).slice(0, 8);
+  const hits = stations.filter(s => s.n.toLowerCase().includes(q)).sort((a,b) => a.t - b.t).slice(0, 8);
   if(!hits.length){ suggestEl.style.display = "none"; return; }
   for(const s of hits){
     const t = stationTimeTo(s);
@@ -821,6 +875,9 @@ function shareUrl(){
     max: String(maxMin),
     arrive: document.getElementById("arriveSel").value,
   });
+  // Omitted while Sydney is the only city, so a single-city build emits exactly the
+  // links it always did and old links keep resolving.
+  if(CITIES.length > 1) p.set("city", city.id);
   if(dest.name) p.set("name", dest.name.slice(0, MAX_NAME_LEN));
   return location.origin + location.pathname + "#" + p.toString();
 }
@@ -837,6 +894,12 @@ function syncShareUrl(){
 function applyShareUrl(){
   if(!location.hash || location.hash.length < 2) return;
   const p = new URLSearchParams(location.hash.slice(1));
+
+  // City first: it resets the destination, so the destination in the link has to be
+  // applied on top of it. An unknown id falls through to the default rather than
+  // failing the whole link.
+  const wanted = cityById(p.get("city") || "");
+  if(wanted && wanted !== city) applyCity(wanted);
 
   const lat = Number(p.get("lat")), lon = Number(p.get("lon"));
   if(Number.isFinite(lat) && Number.isFinite(lon) &&
@@ -883,6 +946,7 @@ document.getElementById("shareBtn").addEventListener("click", async () => {
 
 // ======================= boot =======================
 loadIsoCache();       // before the first fetch, so a reload can answer from disk
+renderCityPicker();   // before applyShareUrl, which may select a city into it
 applyShareUrl();      // a shared link overrides the defaults above
 renderLegend();
 map.addLayer(stationLayer);
