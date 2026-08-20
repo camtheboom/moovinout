@@ -46,11 +46,24 @@
         <button class="btn small" id="pickDest">Change</button>
       </div>
       <div class="picking-note" id="pickingNote">Click anywhere on the map to set the destination…</div>
+      <button class="btn small share" id="shareBtn">Copy shareable link</button>
     </div>
 
     <div class="section">
       <h2>Saved spots<span class="count" id="savedCount"></span></h2>
       <div class="saved" id="savedList"></div>
+    </div>
+
+    <div class="section">
+      <h2>Rent<span class="count" id="rentCount"></span></h2>
+      <div class="rowline">
+        <input type="checkbox" id="showRent">
+        <label for="showRent">Show median rent by suburb</label>
+      </div>
+      <div id="rentSampleWarn" class="rent-warn">Sample figures for layout only — not real rents. Add rentdata.js, or connect a Domain API key.</div>
+      <div class="rent-source" id="rentSource"></div>
+      <button class="btn small share" id="rentFiltersBtn">Rent filters…</button>
+      <div class="rent-active" id="rentActive"></div>
     </div>
 
     <div class="section" id="arriveSection">
@@ -117,11 +130,59 @@
   </div>
 </div>
 
+<div class="overlay" id="rentOverlay">
+  <div class="modal">
+    <h3>Rent filters</h3>
+    <p>Narrows which suburbs show a rent marker. The point of this layer is the overlap: somewhere inside your travel-time bands <em>and</em> inside your budget.</p>
+
+    <label>Weekly rent</label>
+    <div class="rangerow">
+      <input id="rentMin" type="number" min="0" step="25" placeholder="no min" inputmode="numeric">
+      <span>to</span>
+      <input id="rentMax" type="number" min="0" step="25" placeholder="no max" inputmode="numeric">
+    </div>
+
+    <label>Bedrooms</label>
+    <div class="modes" id="rentBeds">
+      <button data-b="any" class="on">Any</button>
+      <button data-b="0">Studio</button>
+      <button data-b="1">1</button>
+      <button data-b="2">2</button>
+      <button data-b="3">3</button>
+      <button data-b="4">4+</button>
+    </div>
+
+    <label>Property type</label>
+    <div class="modes" id="rentTypes">
+      <button data-t="any" class="on">Any</button>
+      <button data-t="apartment">Apartment</button>
+      <button data-t="house">House</button>
+      <button data-t="townhouse">Townhouse</button>
+    </div>
+
+    <div class="rowline" style="margin-top:12px;">
+      <input type="checkbox" id="rentWithinBands" checked>
+      <label for="rentWithinBands">Only inside my travel-time bands</label>
+    </div>
+
+    <div class="err" id="rentErr"></div>
+    <div class="actions">
+      <button class="btn" id="rentReset">Reset</button>
+      <button class="btn primary" id="rentApply">Apply</button>
+    </div>
+  </div>
+</div>
+
 <!--
   Load order matters: these are plain scripts sharing one global scope, so
   app.js must come last — it reads MOOVIN_CONFIG and the station data at parse time.
+  rentals.js is the exception: it loads after app.js because it builds on the map
+  app.js creates, and the site works fine if it's absent.
 
   Station data lives in stations.js (separate file, easy to extend).
+  Rent data lives in rentdata.js — generated, not hand-edited; regenerate it with
+  tools/build-rent-data.py. If it's absent the rent layer falls back to sample
+  figures rather than breaking.
   API keys live in config.js, which is gitignored — see config.example.js
   for the template and README.md for setup instructions. If config.js is
   absent (e.g. a fresh clone before you've made your own), the site just
@@ -130,5 +191,7 @@
 <script src="stations.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script src="rentdata.js"></script>
+<script src="rentals.js"></script>
 </body>
 </html>

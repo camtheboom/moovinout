@@ -3,3 +3,5 @@ config.js
 node_modules/
 .wrangler/
 .dev.vars
+tools/.cache/
+__pycache__/

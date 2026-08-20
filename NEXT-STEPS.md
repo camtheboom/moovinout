@@ -1,6 +1,7 @@
 # Where this is up to
 
-Working notes from the session on **2026-08-17**. Two features built, both working, **neither committed yet**.
+Working notes from the sessions on **2026-08-17** and **2026-08-19**. Three features built, all working,
+**none committed yet**. Only the Worker (2) needs anything from you.
 
 ---
 
@@ -63,6 +64,40 @@ Limit is set to 20/min per IP in `wrangler.toml`.
 
 ---
 
+---
+
+## 3. NSW bond rent data — done, no key or deploy needed
+
+The rent overlay now ships real figures instead of the sample ones. Source is NSW Fair
+Trading's rental bond lodgements: every residential bond lodged in NSW, published monthly
+as open data, so these are rents tenants actually agreed to rather than asking prices.
+
+`tools/build-rent-data.py` scrapes the source page, rolls the newest 12 monthly
+spreadsheets into medians per postcode, joins postcode centroids, and writes `rentdata.js`
+— 478 postcodes from 290,710 bonds, bundled in the page like `stations.js`. No key, no
+proxy, no quota. Re-run it (`pip install openpyxl` first) whenever you want fresher
+numbers; Fair Trading posts a new month around mid-month.
+
+This also settles the Domain question. A key is now optional and, on your current project,
+still blocked — listing search is a Production-environment operation and the project is
+Sandbox-only, so the call 403s and the overlay falls back to the bond data. That fallback
+was verified in the browser with your real `config.js`.
+
+Two things worth knowing:
+
+- **The filters had a bug that only real data exposed.** Sample areas had every bedroom
+  count and dwelling type, so a missing figure never came up. Real data is sparse — 413 of
+  478 postcodes have no studio median — and `rentFor()` was falling through to the 2-bed
+  figure, so filtering to Studio showed Eastlakes at $1000, its 2-bed rent. A missing
+  segment now reads as missing and the area drops off the map.
+- **Bedrooms and dwelling type are separate medians**, so neither can answer "2-bed
+  apartment". `rentdata.js` now carries the two crossed as well (`x:{"2a":820}`), which is
+  what the pin shows when both filters are set, called out at the top of the popup so it
+  doesn't look like it disagrees with the breakdown under it.
+
+Still NSW-only. Every other state runs its own bond board with its own format and cadence,
+and the NT has no bond board at all, so going national means one adapter per state.
+
 ## Everything that was verified
 
 Worker, against a real Geoapify call: happy path (200 / MISS / transit mode / 3 correct features), cache HIT on repeat, grid snapping collapsing same-cell requests, reordered range values sharing a cache entry, all five validation rejections (out of bbox, non-numeric lat/lon, missing range, non-numeric range, too many ranges), 405 on POST, 404 on wrong path, CORS preflight, and origin allow/deny.
@@ -87,11 +122,17 @@ End to end in the browser: a page with **no key in it at all** rendering live ba
 ## Uncommitted state
 
 ```
- M .gitignore          node_modules/, .wrangler/, .dev.vars
- M README.md           saved spots + worker deploy docs
- M config.example.js   apiBase option
- M index.html          saved spots feature, proxy provider, escapeHtml, estimateAt
+ M .gitignore          node_modules/, .wrangler/, .dev.vars, tools/.cache/
+ M README.md           saved spots + worker deploy docs + rewritten rent section
+ M config.example.js   apiBase option, Domain now documented as optional
+ M index.html          saved spots feature, proxy provider, escapeHtml, estimateAt,
+                       rentdata.js script tag, Studio filter button, source line
+ M styles.css          rent source line, combined-figure popup row
+ M app.js              saved spots
 ?? worker/             package.json, wrangler.toml, src/index.js
+?? rentals.js          rent overlay + NSW bond provider
+?? rentdata.js         generated — 478 postcodes, do not hand-edit
+?? tools/              build-rent-data.py
 ```
 
 `config.js` and `worker/.dev.vars` are both confirmed gitignored, so neither key can be committed by accident.

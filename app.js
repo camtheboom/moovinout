@@ -37,7 +37,7 @@ let dest = {...DEFAULT_DEST};
 let maxMin = 30;
 let picking = false;
 let liveMode = false;           // true once API works
-const isoCache = new Map();     // key -> geojson-ish shapes
+const isoCache = new Map();     // key -> {shapes, ts}; see the isochrone cache section
 
 // ======================= map =======================
 const map = L.map("map", {zoomControl:false, preferCanvas:true}).setView([-33.8730, 151.2069], 12);
@@ -175,17 +175,75 @@ function nextArrivalISO(sel){
   }
 }
 
+// ======================= isochrone cache =======================
+// Two tiers over one Map: the Map is the session cache, and it's mirrored into
+// localStorage so a reload doesn't re-spend API quota on the same lookups. Every
+// provider call is metered, so a cache hit is real money saved, not just latency.
+const ISO_KEY = "moovin.iso.v1";
+const ISO_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // a week; transit networks don't move fast
+const ISO_MAX_ENTRIES = 12;                   // shapes are big and localStorage is ~5 MB
+
+// Coordinates land with far more precision than a map needs. 5 dp is ~1 m, and the
+// rounding roughly halves what gets written.
+const r5 = n => Math.round(n * 1e5) / 1e5;
+function compactShapes(shapes){
+  const out = {};
+  for(const [level, list] of Object.entries(shapes)){
+    out[level] = list.map(s => ({
+      shell: s.shell.map(p => ({lat: r5(p.lat), lng: r5(p.lng)})),
+      holes: (s.holes || []).map(h => h.map(p => ({lat: r5(p.lat), lng: r5(p.lng)}))),
+    }));
+  }
+  return out;
+}
+
+function loadIsoCache(){
+  let raw;
+  try{ raw = localStorage.getItem(ISO_KEY); }catch{ return; }   // private mode, etc.
+  if(!raw) return;
+  try{
+    const cutoff = Date.now() - ISO_TTL_MS;
+    for(const [key, entry] of Object.entries(JSON.parse(raw) || {})){
+      if(entry && entry.ts > cutoff && entry.shapes) isoCache.set(key, entry);
+    }
+  }catch{ /* corrupt or from an older shape — just start empty */ }
+}
+
+function persistIsoCache(){
+  // Newest first, then truncated: the cap is an eviction policy, not just a size guard.
+  const entries = [...isoCache.entries()].sort((a, b) => b[1].ts - a[1].ts);
+  for(let n = Math.min(entries.length, ISO_MAX_ENTRIES); n > 0; n--){
+    const obj = {};
+    for(const [key, e] of entries.slice(0, n)) obj[key] = {ts: e.ts, shapes: compactShapes(e.shapes)};
+    try{ localStorage.setItem(ISO_KEY, JSON.stringify(obj)); return; }
+    catch{ /* over quota — drop the oldest entry and try again */ }
+  }
+  try{ localStorage.removeItem(ISO_KEY); }catch{}
+}
+
+// Credentials changed, so anything cached under them is suspect.
+function clearIsoCache(){
+  isoCache.clear();
+  try{ localStorage.removeItem(ISO_KEY); }catch{}
+}
+
 // ======================= isochrone providers =======================
+function isoCacheKey(arriveSel, levels){
+  return [creds.provider, dest.lat.toFixed(5), dest.lon.toFixed(5),
+          creds.provider === "traveltime" ? arriveSel : "-", levels.join(",")].join("|");
+}
+
 async function fetchIsochrones(){
   const arriveSel = document.getElementById("arriveSel").value;
   const levels = BANDS.map(b => b.max).filter(m => m <= maxMin);
-  const key = [creds.provider, dest.lat.toFixed(5), dest.lon.toFixed(5),
-               creds.provider === "traveltime" ? arriveSel : "-", levels.join(",")].join("|");
-  if(isoCache.has(key)) return isoCache.get(key);
+  const key = isoCacheKey(arriveSel, levels);
+  const hit = isoCache.get(key);
+  if(hit) return hit.shapes;
   const shapes = creds.provider === "proxy" ? await fetchProxy(levels)
     : creds.provider === "geoapify" ? await fetchGeoapify(levels)
     : await fetchTravelTime(levels, arriveSel);
-  isoCache.set(key, shapes);
+  isoCache.set(key, {shapes, ts: Date.now()});
+  persistIsoCache();
   return shapes;
 }
 
@@ -316,6 +374,8 @@ function renderIsochrones(shapes){
   }
   updateHome();              // new bands mean a new frame to snap back to
   setAtHome(viewIsHome());
+  // rentals.js filters suburbs against these bands; optional dependency, may be absent.
+  if(typeof renderRentals === "function") renderRentals();
 }
 
 async function refreshLive(){
@@ -580,6 +640,7 @@ function setDestination(lat, lon, name){
   renderStations();
   renderSaved();      // saved-spot times are relative to the destination
   refreshLive();
+  syncShareUrl();
 }
 window.setDestination = setDestination;
 
@@ -608,13 +669,13 @@ const slider = document.getElementById("slider");
 slider.addEventListener("change", () => {
   maxMin = +slider.value;
   document.getElementById("maxmin").textContent = "≤ " + maxMin + " min";
-  renderLegend(); renderStations(); refreshLive();
+  renderLegend(); renderStations(); refreshLive(); syncShareUrl();
 });
 slider.addEventListener("input", () => {
   document.getElementById("maxmin").textContent = "≤ " + slider.value + " min";
 });
 
-document.getElementById("arriveSel").addEventListener("change", () => { refreshLive(); });
+document.getElementById("arriveSel").addEventListener("change", () => { refreshLive(); syncShareUrl(); });
 
 document.getElementById("showStations").addEventListener("change", e => {
   if(e.target.checked){ map.addLayer(stationLayer); renderStations(); }
@@ -698,7 +759,7 @@ document.getElementById("useApprox").addEventListener("click", () => {
 });
 document.getElementById("useShared").addEventListener("click", async () => {
   creds = {...creds, provider: "proxy"};
-  isoCache.clear();
+  clearIsoCache();
   overlay.classList.remove("show");
   liveMode = true;
   await refreshLive();
@@ -719,7 +780,7 @@ document.getElementById("saveKeys").addEventListener("click", async () => {
     errEl.style.display = "block"; return;
   }
   creds = {provider: modalProvider, appId, apiKey, gaKey};
-  isoCache.clear();
+  clearIsoCache();
   // validate with a real request
   const btn = document.getElementById("saveKeys");
   btn.disabled = true; btn.textContent = "Checking…";
@@ -747,7 +808,82 @@ document.getElementById("collapseBtn").addEventListener("click", () => {
   document.getElementById("collapseBtn").textContent = p.classList.contains("min") ? "+" : "–";
 });
 
+// ======================= shareable links =======================
+// State lives in the hash rather than the query string so it costs no server config on
+// any static host, and so changing it never triggers a navigation.
+const ARRIVE_VALUES = [...document.getElementById("arriveSel").options].map(o => o.value);
+const MAX_NAME_LEN = 80;
+
+function shareUrl(){
+  const p = new URLSearchParams({
+    lat: dest.lat.toFixed(5),
+    lon: dest.lon.toFixed(5),
+    max: String(maxMin),
+    arrive: document.getElementById("arriveSel").value,
+  });
+  if(dest.name) p.set("name", dest.name.slice(0, MAX_NAME_LEN));
+  return location.origin + location.pathname + "#" + p.toString();
+}
+
+// Rewrites the address bar in place, so whatever is on screen is always what a copied
+// URL would reproduce. replaceState rather than pushState: panning around the map
+// shouldn't bury the back button under a hundred history entries.
+function syncShareUrl(){
+  try{ history.replaceState(null, "", shareUrl()); }catch{}
+}
+
+// Everything here is attacker-controllable — it arrives in a link someone was sent — so
+// each field is range-checked and nothing is trusted to be the right type or shape.
+function applyShareUrl(){
+  if(!location.hash || location.hash.length < 2) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+
+  const lat = Number(p.get("lat")), lon = Number(p.get("lon"));
+  if(Number.isFinite(lat) && Number.isFinite(lon) &&
+     lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180){
+    const name = (p.get("name") || "").slice(0, MAX_NAME_LEN).trim();
+    dest = {lat, lon, name: name || (lat.toFixed(3) + ", " + lon.toFixed(3))};
+    destMarker.setLatLng([lat, lon]);
+    document.getElementById("destName").textContent = dest.name;   // textContent, never HTML
+    map.setView([lat, lon], map.getZoom());
+  }
+
+  // Only the discrete values the slider can actually produce.
+  const max = Number(p.get("max"));
+  if(BANDS.some(b => b.max === max)){
+    maxMin = max;
+    document.getElementById("slider").value = String(max);
+    document.getElementById("maxmin").textContent = "≤ " + max + " min";
+  }
+
+  const arrive = p.get("arrive");
+  if(ARRIVE_VALUES.includes(arrive)) document.getElementById("arriveSel").value = arrive;
+}
+
+// Pasting a share link into a tab that's already open changes only the hash, which is
+// not a navigation — boot never re-runs. Without this the link would appear to do nothing.
+// (replaceState doesn't fire this event, so syncShareUrl can't feed back into it.)
+window.addEventListener("hashchange", () => {
+  if(location.href === shareUrl()) return;
+  applyShareUrl();
+  renderLegend(); renderStations(); renderSaved(); refreshLive();
+});
+
+document.getElementById("shareBtn").addEventListener("click", async () => {
+  const url = shareUrl();
+  try{
+    await navigator.clipboard.writeText(url);
+    toast("Link copied — it reopens this destination and time budget.");
+  }catch{
+    // Clipboard needs a secure context; plain http://<lan-ip> during dev isn't one.
+    syncShareUrl();
+    toast("Couldn't reach the clipboard — the link is in the address bar, copy it from there.");
+  }
+});
+
 // ======================= boot =======================
+loadIsoCache();       // before the first fetch, so a reload can answer from disk
+applyShareUrl();      // a shared link overrides the defaults above
 renderLegend();
 map.addLayer(stationLayer);
 document.getElementById("showStations").checked = true;
