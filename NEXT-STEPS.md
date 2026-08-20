@@ -1,7 +1,7 @@
 # Where this is up to
 
 Working notes from the sessions on **2026-08-17** and **2026-08-19**. Three features built, all working,
-**none committed yet**. Only the Worker (2) needs anything from you.
+and all committed as of `c5ec64b`. Only the Worker (2) still needs anything from you.
 
 ---
 
@@ -119,20 +119,14 @@ End to end in the browser: a page with **no key in it at all** rendering live ba
 
 ---
 
-## Uncommitted state
+## Commit state
+
+All three features are committed and pushed. The Worker landed in `b57c13e`; the rent
+overlay, its generated data and the build tool landed in `c5ec64b`:
 
 ```
- M .gitignore          node_modules/, .wrangler/, .dev.vars, tools/.cache/
- M README.md           saved spots + worker deploy docs + rewritten rent section
- M config.example.js   apiBase option, Domain now documented as optional
- M index.html          saved spots feature, proxy provider, escapeHtml, estimateAt,
-                       rentdata.js script tag, Studio filter button, source line
- M styles.css          rent source line, combined-figure popup row
- M app.js              saved spots
-?? worker/             package.json, wrangler.toml, src/index.js
-?? rentals.js          rent overlay + NSW bond provider
-?? rentdata.js         generated — 478 postcodes, do not hand-edit
-?? tools/              build-rent-data.py
+b57c13e restructure        worker/ (package.json, wrangler.toml, src/index.js), saved spots
+c5ec64b Half finished MVP  rentals.js, rentdata.js, tools/build-rent-data.py
 ```
 
-`config.js` and `worker/.dev.vars` are both confirmed gitignored, so neither key can be committed by accident.
+Nothing is outstanding in the working tree. `config.js` and `worker/.dev.vars` are both confirmed gitignored, so neither key can be committed by accident.
