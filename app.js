@@ -151,32 +151,57 @@ function haversine(a, b, c, d){
   return 2*R*Math.asin(Math.sqrt(h));
 }
 
-// Sydney local time offset: AEDT (+11) first Sun Oct → first Sun Apr, else AEST (+10)
-function sydneyOffset(d){
-  const y = d.getUTCFullYear();
-  function firstSunday(year, month){ // month 0-based, returns UTC ms of 2am Sydney standard
-    const dt = new Date(Date.UTC(year, month, 1));
-    const dow = dt.getUTCDay();
-    const day = 1 + ((7 - dow) % 7);
-    return Date.UTC(year, month, day, 2 - 10); // 2am AEST in UTC
-  }
-  const octSun = firstSunday(y, 9), aprSun = firstSunday(y, 3);
-  const t = d.getTime();
-  return (t >= octSun || t < aprSun) ? 11 : 10;
+// Local UTC offset for an IANA zone at a given instant, in minutes.
+//
+// This used to be hand-rolled AEDT/AEST rules. Intl already ships every Australian
+// daylight-saving rule, so going national is a table lookup rather than eight more sets
+// of rules — including the three states that don't observe DST at all (QLD, WA, NT) and
+// the two zones that sit on the half hour (Adelaide, Darwin).
+//
+// Read the instant as wall-clock in the target zone, reinterpret those components as if
+// they were UTC, and the difference is the offset. Done this way rather than via
+// timeZoneName:"longOffset" because the parts form works on older engines too.
+function zoneOffsetMinutes(d, tz){
+  const parts = {};
+  for(const {type, value} of new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(d)) parts[type] = value;
+  // hour12:false renders midnight as "24" on some engines.
+  const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day,
+                         +parts.hour % 24, +parts.minute, +parts.second);
+  return Math.round((asUTC - Math.floor(d.getTime() / 1000) * 1000) / 60000);
 }
+
+// "+11:00", "+09:30". Minutes rather than whole hours because Adelaide and Darwin are
+// half an hour off and the old whole-hour formatting would have emitted "+9:00" for them.
+function offsetLabel(mins){
+  const a = Math.abs(mins);
+  return (mins < 0 ? "-" : "+") +
+         String(Math.floor(a / 60)).padStart(2, "0") + ":" +
+         String(a % 60).padStart(2, "0");
+}
+
 function nextArrivalISO(sel){
-  // returns ISO string with explicit Sydney offset for the next matching day
+  // returns an ISO string with an explicit offset for the active city, on the next
+  // matching day
   const now = new Date();
   const wantSat = sel.startsWith("sa");
   const hh = +sel.slice(2,4), mm = +sel.slice(4,6);
   for(let i = 1; i <= 8; i++){
     const cand = new Date(now.getTime() + i*86400000);
     const dow = cand.getUTCDay();
-    const ok = wantSat ? dow === 6 : (dow >= 2 && dow <= 4); // prefer Tue–Thu for typical weekday
+    const ok = wantSat ? dow === 6 : (dow >= 2 && dow <= 4); // prefer Tue-Thu for typical weekday
     if(!ok) continue;
-    const off = sydneyOffset(cand);
     const y = cand.getUTCFullYear(), mo = String(cand.getUTCMonth()+1).padStart(2,"0"), da = String(cand.getUTCDate()).padStart(2,"0");
-    return `${y}-${mo}-${da}T${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:00+${String(off).padStart(2,"0")}:00`;
+    // The offset wanted is the one in force at the arrival itself, not the one in force
+    // now — those differ across a DST boundary. Probe at roughly the target instant
+    // (any Australian zone is within a couple of hours of +10, and transitions happen at
+    // 2am local, so a rough probe lands on the correct side of one).
+    const probe = new Date(Date.UTC(y, cand.getUTCMonth(), cand.getUTCDate(), hh - 10, mm));
+    const off = offsetLabel(zoneOffsetMinutes(probe, city.tz));
+    return `${y}-${mo}-${da}T${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:00${off}`;
   }
 }
 
