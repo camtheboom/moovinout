@@ -8,6 +8,14 @@ compatibility_date = "2026-08-01"
 [vars]
 ALLOWED_ORIGINS = ""
 
+# Destinations this endpoint will answer for, as
+#   name:minLat,maxLat,minLon,maxLon
+# separated by semicolons. This is the spend guard — anything outside every listed box is
+# rejected before it can reach the provider, so leaving it empty is not "allow all": it
+# falls back to the Sydney box built into src/index.js. Adding a city goes here, not in
+# the code. A malformed entry is skipped and the rest still serve.
+SERVED_AREAS = "sydney:-34.30,-33.30,150.30,151.60"
+
 # Shared isochrone cache — the thing that keeps a shared key affordable.
 # Create the namespace once with:
 #   npx wrangler kv namespace create ISO_CACHE

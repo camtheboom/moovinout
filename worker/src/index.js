@@ -18,9 +18,13 @@ const GEOAPIFY = "https://api.geoapify.com/v1/isoline";
 // so snapping to it costs nothing visually and buys a much higher hit rate.
 const GRID = 0.003;
 
-// Greater Sydney, roughly. Keeps the endpoint from being repurposed as a free
-// global isochrone API on the owner's credit balance.
-const BBOX = {minLat: -34.30, maxLat: -33.30, minLon: 150.30, maxLon: 151.60};
+// The areas this endpoint will answer for, as a fallback when SERVED_AREAS is unset.
+// Greater Sydney, roughly — the point is to keep the endpoint from being repurposed as a
+// free global isochrone API on the owner's credit balance, so it stays deny-by-default.
+// Adding a city is a wrangler.toml edit, not a code change; see SERVED_AREAS there.
+const DEFAULT_AREAS = [
+  {name: "sydney", minLat: -34.30, maxLat: -33.30, minLon: 150.30, maxLon: 151.60},
+];
 
 const MAX_RANGES = 8;
 const MIN_RANGE_S = 60;
@@ -43,7 +47,7 @@ export default {
     if(origin && !isAllowed(origin, env)) return fail(403, "This origin isn't allowed to use this endpoint.", cors);
 
     let params;
-    try{ params = parseParams(url.searchParams); }
+    try{ params = parseParams(url.searchParams, env); }
     catch(err){ return fail(400, err.message, cors); }
 
     const cacheKey = `iso:v1:${params.lat}:${params.lon}:${params.ranges.join(",")}`;
@@ -74,14 +78,45 @@ export default {
   },
 };
 
+// ======================= served areas =======================
+// "sydney:-34.30,-33.30,150.30,151.60; melbourne:-38.50,-37.40,144.30,145.60"
+// — name, then minLat,maxLat,minLon,maxLon. Parsed per request but memoised on the raw
+// string, because env is the same object for the life of the isolate.
+let areasCache = {raw: null, areas: null};
+
+function servedAreas(env){
+  const raw = String(env.SERVED_AREAS || "").trim();
+  if(!raw) return DEFAULT_AREAS;
+  if(areasCache.raw === raw) return areasCache.areas;
+
+  const areas = [];
+  for(const chunk of raw.split(";").map(s => s.trim()).filter(Boolean)){
+    const [name, nums] = chunk.includes(":") ? chunk.split(":") : ["area", chunk];
+    const n = nums.split(",").map(v => Number(v.trim()));
+    // A malformed entry is skipped rather than thrown: a typo in one city should not
+    // take the whole endpoint down for the others.
+    if(n.length !== 4 || n.some(v => !Number.isFinite(v))) continue;
+    areas.push({name: name.trim(), minLat: Math.min(n[0], n[1]), maxLat: Math.max(n[0], n[1]),
+                minLon: Math.min(n[2], n[3]), maxLon: Math.max(n[2], n[3])});
+  }
+  // Every entry malformed is indistinguishable from a broken deploy, so fall back to
+  // the built-in area rather than silently serving nowhere.
+  const out = areas.length ? areas : DEFAULT_AREAS;
+  areasCache = {raw, areas: out};
+  return out;
+}
+
+const inArea = (a, lat, lon) =>
+  lat >= a.minLat && lat <= a.maxLat && lon >= a.minLon && lon <= a.maxLon;
+
 // ======================= request parsing =======================
 const snap = v => +(Math.round(v / GRID) * GRID).toFixed(4);
 
-function parseParams(sp){
+function parseParams(sp, env){
   const lat = Number(sp.get("lat"));
   const lon = Number(sp.get("lon"));
   if(!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("lat and lon must be numbers.");
-  if(lat < BBOX.minLat || lat > BBOX.maxLat || lon < BBOX.minLon || lon > BBOX.maxLon){
+  if(!servedAreas(env).some(a => inArea(a, lat, lon))){
     throw new Error("That destination is outside the area this endpoint covers.");
   }
 
