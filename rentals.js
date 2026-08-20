@@ -129,6 +129,22 @@ const RENT_PROVIDERS = {
     }));
   },
 
+  // Victorian Rental Report figures, pre-aggregated into rentdata-vic.js by
+  // tools/build-rent-data-vic.py. Same bond-based idea as NSW and the same licence, but
+  // DFFH publishes finished medians rather than per-bond rows, and its geography is its
+  // own named suburb groups rather than postcodes — hence no postcode field, and
+  // derived:true on the bedroom and type figures, which are blends rather than published
+  // medians. See the header of rentdata-vic.js.
+  async vicbonds(){
+    if(typeof VIC_RENT_DATA === "undefined") throw new Error("rentdata-vic.js is not loaded.");
+    return VIC_RENT_DATA.areas.map(a => ({
+      id: "vic" + a.n, postcode: "", name: a.n,
+      lat: a.lat, lon: a.lon,
+      byBed: a.bed, byType: a.type, byBedType: a.x, overall: a.all,
+      count: a.c, sample: false, derived: true,
+    }));
+  },
+
   // UNVERIFIED — written against Domain's documented residential search but never run,
   // because it needs a key this project doesn't have yet. Two things may still bite:
   //   1. CORS. If Domain doesn't send permissive headers the browser blocks this outright,
@@ -237,6 +253,8 @@ function rentFor(area){
   }
   if(beds !== "any") return area.byBed[beds] != null ? area.byBed[beds] : null;
   if(type !== "any") return area.byType[type] != null ? area.byType[type] : null;
+  // Victoria publishes a real all-properties median; prefer it over inferring one.
+  if(area.overall != null) return area.overall;
   if(area.byBed[2] != null) return area.byBed[2];           // 2-bed is the usual reference point
   const vals = Object.values(area.byBed).concat(Object.values(area.byType));
   return vals.length ? median(vals) : null;
@@ -329,20 +347,39 @@ function rentPopupHtml(area){
   }
   // escapeHtml comes from app.js — suburb names arrive from an API on the Domain path.
   const title = (typeof escapeHtml === "function" ? escapeHtml : String)(area.name);
+  const unit = rentProvider === "domain" ? " listings · median weekly"
+                                        : " bonds lodged · median weekly rent";
   const note = area.sample
     ? '<div class="rsample">Sample figure — not real rent data</div>'
-    : '<div class="meta">' + area.count +
-      (rentProvider === "nswbonds" ? " bonds lodged · median weekly rent"
-                                   : " listings · median weekly") + "</div>";
+    : '<div class="meta">' + area.count + unit + "</div>";
+
   // With both filters set the marker shows the crossed figure, which appears in neither
   // list below — so state it, or the pin looks like it disagrees with its own popup.
-  const combined = (rentFilters.beds !== "any" && rentFilters.type !== "any")
-    ? '<div class="rrow rcombined"><span>' + BED_LABEL[rentFilters.beds].toLowerCase() +
-      " " + rentFilters.type + '</span><b>$' + rentFor(area) + "</b></div>"
+  const bothSet = rentFilters.beds !== "any" && rentFilters.type !== "any";
+  // Same problem one step along: on derived data a bedroom-only or type-only figure is a
+  // blend of the published cells rather than one of the rows below, so it gets the same
+  // callout, worded so it doesn't read as a published median.
+  const oneSet = !bothSet && (rentFilters.beds !== "any" || rentFilters.type !== "any");
+  let combined = "";
+  if(bothSet){
+    combined = '<div class="rrow rcombined"><span>' + BED_LABEL[rentFilters.beds].toLowerCase() +
+      " " + rentFilters.type + '</span><b>$' + rentFor(area) + "</b></div>";
+  }else if(oneSet && area.derived){
+    const label = rentFilters.beds !== "any" ? BED_LABEL[rentFilters.beds].toLowerCase()
+                                             : rentFilters.type;
+    combined = '<div class="rrow rcombined"><span>' + label + ' · combined</span><b>$' +
+      rentFor(area) + "</b></div>";
+  }
+
+  // Victoria publishes only the crossing, so everything in the breakdown is a blend.
+  // Saying so once beats footnoting six rows.
+  const derivedNote = area.derived
+    ? '<div class="rderived">Bedroom and dwelling figures are combined from the published ' +
+      'flat and house medians — Victoria publishes only the two crossed.</div>'
     : "";
 
-  return '<div class="pn">' + title + " " + area.postcode + "</div>" +
-         note + '<div class="rtable">' + combined + rows.join("") + "</div>" +
+  return '<div class="pn">' + title + (area.postcode ? " " + area.postcode : "") + "</div>" +
+         note + '<div class="rtable">' + combined + rows.join("") + "</div>" + derivedNote +
          '<button class="setdest" onclick="setDestination(' + area.lat + "," + area.lon +
          ',&quot;' + title.replace(/"/g, "") + '&quot;)">Set as destination</button>';
 }
@@ -385,7 +422,12 @@ function describeFilters(){
 let rentLoadSeq = 0;
 let rentProvider = "sample";     // which provider produced what is currently in rentAreas
 
-const hasBondData = () => typeof NSW_RENT_DATA !== "undefined";
+// Each state ships its own bundled file, so "is there bond data" is a per-city question.
+const BOND_DATA = {
+  nswbonds: () => typeof NSW_RENT_DATA !== "undefined",
+  vicbonds: () => typeof VIC_RENT_DATA !== "undefined",
+};
+const hasBondData = () => !!(BOND_DATA[city.rent] && BOND_DATA[city.rent]());
 
 // A Domain key is an explicit opt-in to live asking prices, so it wins where present.
 // Otherwise the bundled bond data, and sample figures only if that file is missing too.
@@ -407,6 +449,9 @@ function describeSource(){
   if(rentProvider === "nswbonds"){
     return "NSW Fair Trading bonds · " + NSW_RENT_DATA.months + " months to " +
            monthLabel(NSW_RENT_DATA.to);
+  }
+  if(rentProvider === "vicbonds"){
+    return "Victorian RTBA bonds · " + VIC_RENT_DATA.months + " months to " + VIC_RENT_DATA.to;
   }
   return "";
 }

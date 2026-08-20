@@ -53,9 +53,7 @@ const CITIES = [
 
     stations: () => (typeof STATIONS_MEL !== "undefined" ? STATIONS_MEL : []),
 
-    // No Victorian rent source wired up yet — the overlay says so rather than showing
-    // NSW figures over a Melbourne map.
-    rent: null,
+    rent: "vicbonds",
   },
 ];
 

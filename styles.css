@@ -145,6 +145,12 @@ input[type=range]{flex:1; accent-color:var(--accent);}
   padding-bottom:5px; margin-bottom:5px; border-bottom:1px solid var(--line);
 }
 .rtable .rcombined span{color:var(--ink); font-weight:600;}
+/* Victoria publishes only the bedroom x type crossing, so its marginals are blends.
+   Muted and small: it qualifies the table above without competing with it. */
+.rderived{
+  color:var(--muted); font-size:11px; line-height:1.35; margin-top:6px;
+  padding-top:5px; border-top:1px solid var(--line);
+}
 .rsample{
   font-size:11px; font-weight:700; color:#92400e; background:#fef3c7;
   border-radius:6px; padding:3px 7px; margin-top:4px; display:inline-block;
