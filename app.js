@@ -19,8 +19,10 @@ const BANDS = [
   {max:50, color:"#7c3aed"},
   {max:60, color:"#4338ca"},
 ];
-const MODE_LABEL = {train:"Train", metro:"Metro", lightrail:"Light rail", ferry:"Ferry", bus:"Bus"};
-const MODE_RADIUS = {train:950, metro:950, lightrail:650, ferry:700, bus:600};
+const MODE_LABEL = {train:"Train", metro:"Metro", lightrail:"Light rail", tram:"Tram", ferry:"Ferry", bus:"Bus"};
+// Melbourne trams stop every couple of hundred metres, so their catchment is much
+// tighter than Sydney light rail even though the mode is nearly the same thing.
+const MODE_RADIUS = {train:950, metro:950, lightrail:650, tram:450, ferry:700, bus:600};
 const WALK_M_PER_MIN = 80;
 
 // ======================= state =======================
@@ -668,6 +670,7 @@ function applyCity(next){
   city = next;
   stations = city.stations();
   dest = {...city.cbd};
+  document.getElementById("cityTag").textContent = "· " + city.name;
   destMarker.setLatLng([dest.lat, dest.lon]);
   document.getElementById("destName").textContent = dest.name;
   const sel = document.getElementById("citySel");
@@ -972,6 +975,7 @@ document.getElementById("shareBtn").addEventListener("click", async () => {
 // ======================= boot =======================
 loadIsoCache();       // before the first fetch, so a reload can answer from disk
 renderCityPicker();   // before applyShareUrl, which may select a city into it
+document.getElementById("cityTag").textContent = "· " + city.name;
 applyShareUrl();      // a shared link overrides the defaults above
 renderLegend();
 map.addLayer(stationLayer);

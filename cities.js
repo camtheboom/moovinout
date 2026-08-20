@@ -35,6 +35,28 @@ const CITIES = [
     // Which entry in rentals.js's provider registry serves this city.
     rent: "nswbonds",
   },
+
+  {
+    id: "melbourne",
+    name: "Melbourne",
+
+    // Flinders Street rather than the town hall: it's the anchor the station dataset
+    // measures to, and the one people picture when they say "the city".
+    cbd: {name: "Melbourne CBD (Flinders Street)", lat: -37.8183, lon: 144.9670},
+    view: {lat: -37.8180, lon: 144.9700, zoom: 12},
+    tz: "Australia/Melbourne",
+
+    // Wide enough for Werribee, Sunbury, Pakenham and the Mornington Peninsula, all of
+    // which have stops inside a 60 minute band. Kept in step with the same box in
+    // tools/build-stations.py and worker/wrangler.toml.
+    bbox: {minLat: -38.50, maxLat: -37.40, minLon: 144.30, maxLon: 145.60},
+
+    stations: () => (typeof STATIONS_MEL !== "undefined" ? STATIONS_MEL : []),
+
+    // No Victorian rent source wired up yet — the overlay says so rather than showing
+    // NSW figures over a Melbourne map.
+    rent: null,
+  },
 ];
 
 const DEFAULT_CITY = CITIES[0];

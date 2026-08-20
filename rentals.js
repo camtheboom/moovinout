@@ -380,21 +380,29 @@ function describeFilters(){
 }
 
 // ======================= loading =======================
-let rentLoading = false;
+// Bumped on every load. A provider call is async, so switching city mid-flight would
+// otherwise let the old city's response land after the new city's and win.
+let rentLoadSeq = 0;
 let rentProvider = "sample";     // which provider produced what is currently in rentAreas
 
 const hasBondData = () => typeof NSW_RENT_DATA !== "undefined";
 
 // A Domain key is an explicit opt-in to live asking prices, so it wins where present.
 // Otherwise the bundled bond data, and sample figures only if that file is missing too.
+//
+// The active city has the first say. Rent data is per-state - every state runs its own
+// bond board - so a city with no source wired up shows nothing and says so, rather than
+// borrowing another state's figures onto its map.
 function preferredProvider(){
+  if(!city.rent) return null;
   if(typeof MOOVIN_CONFIG !== "undefined" && MOOVIN_CONFIG.domainApiKey) return "domain";
-  return hasBondData() ? "nswbonds" : "sample";
+  return hasBondData() ? city.rent : "sample";
 }
 
 // One line under the checkbox saying where the numbers came from. Rent figures are the
 // kind of thing people act on, so the layer never shows a number without its provenance.
 function describeSource(){
+  if(!rentProvider) return "No rent data for " + city.name + " yet — NSW only so far.";
   if(rentProvider === "domain") return "Domain listings · asking rents";
   if(rentProvider === "nswbonds"){
     return "NSW Fair Trading bonds · " + NSW_RENT_DATA.months + " months to " +
@@ -409,26 +417,47 @@ function monthLabel(ym){
 }
 
 async function loadRentals(){
-  if(rentLoading) return;
-  rentLoading = true;
+  const seq = ++rentLoadSeq;
   const wanted = preferredProvider();
+  if(!wanted){
+    rentAreas = [];
+    rentProvider = null;
+    document.getElementById("rentSampleWarn").style.display = "none";
+    document.getElementById("rentSource").textContent = describeSource();
+    renderRentals();
+    return;
+  }
+  let areas, provider;
   try{
-    rentAreas = await RENT_PROVIDERS[wanted](rentFilters, map.getBounds());
-    rentProvider = wanted;
+    areas = await RENT_PROVIDERS[wanted](rentFilters, map.getBounds());
+    provider = wanted;
   }catch(err){
     // Live lookup failed: fall back rather than leaving the layer empty, and say why.
     // Bond data is real and already in the page, so it beats sample figures as a net.
-    rentProvider = hasBondData() ? "nswbonds" : "sample";
-    rentAreas = await RENT_PROVIDERS[rentProvider]();
-    toast("Rent data unavailable (" + err.message + ") — showing " +
-          (rentProvider === "nswbonds" ? "NSW bond data." : "sample figures."));
-  }finally{
-    rentLoading = false;
+    provider = (city.rent && hasBondData()) ? city.rent : "sample";
+    areas = await RENT_PROVIDERS[provider]();
+    if(seq === rentLoadSeq){
+      toast("Rent data unavailable (" + err.message + ") — showing " +
+            (provider === "sample" ? "sample figures." : "bond data."));
+    }
   }
+  // A newer load started while this one was in flight — its answer is the current one.
+  if(seq !== rentLoadSeq) return;
+  rentAreas = areas;
+  rentProvider = provider;
   document.getElementById("rentSampleWarn").style.display =
     rentAreas.some(a => a.sample) ? "block" : "none";
   document.getElementById("rentSource").textContent = describeSource();
   renderRentals();
+}
+
+// Rent figures are per-state, so whatever is loaded is invalid the moment the city
+// changes. app.js calls this if it's defined.
+function onCityChanged(){
+  rentAreas = [];
+  rentProvider = "sample";
+  if(rentOn) loadRentals();
+  else renderRentals();
 }
 
 // ======================= UI wiring =======================
