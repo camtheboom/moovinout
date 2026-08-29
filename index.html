@@ -30,7 +30,6 @@
       <div class="sub">Find where to live, by commute — not by vibes. Coloured zones show public-transport travel time to your destination.</div>
       <div class="datasource approx" id="datasource">
         <span class="dot"></span><span id="dslabel">Approximate built-in data</span>
-        <button id="openSettings">API setup</button>
       </div>
       <div class="searchwrap">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -65,7 +64,7 @@
         <input type="checkbox" id="showRent">
         <label for="showRent">Show median rent by suburb</label>
       </div>
-      <div id="rentSampleWarn" class="rent-warn">Sample figures for layout only — not real rents. Add rentdata.js, or connect a Domain API key.</div>
+      <div id="rentSampleWarn" class="rent-warn">Sample figures for layout only — not real rents. Add rentdata.js.</div>
       <div class="rent-source" id="rentSource"></div>
       <button class="btn small share" id="rentFiltersBtn">Rent filters…</button>
       <div class="rent-active" id="rentActive"></div>
@@ -100,38 +99,10 @@
 
     <div class="hint" id="hint">
       <b>Tip:</b> click any spot for a commute estimate, or use “Change” to set your own work destination.
-      <span id="hintExtra">Currently using approximate built-in timetable data — connect a free API key (Geoapify or TravelTime) for real computed bands.</span>
+      <span id="hintExtra">Showing approximate built-in timetable data — live computed bands are unavailable right now.</span>
     </div>
-  </div>
-</div>
 
-<div class="overlay" id="overlay">
-  <div class="modal">
-    <h3>Connect live travel-time data</h3>
-    <p id="sharedNote" style="display:none;">This site already serves live bands from its own shared key, so you don't need one. Add your own only if you've hit the shared rate limit, or want timetable-exact TravelTime data.</p>
-    <p>Pick a provider — either gives real computed isochrones instead of the built-in approximation. Keys stay in this page only (cleared when you close the tab, unless baked into the file).</p>
-    <div class="modes" id="providerTabs" style="margin-bottom:4px;">
-      <button data-p="geoapify" class="on">Geoapify · easy signup</button>
-      <button data-p="traveltime">TravelTime · most accurate</button>
-    </div>
-    <div id="geoapifyFields">
-      <p style="margin-top:8px;">Free with just an email at <a href="https://myprojects.geoapify.com/" target="_blank" rel="noopener">myprojects.geoapify.com</a> (3,000 credits/day, no card). Transit shapes are partly modelled rather than timetable-exact.</p>
-      <label>API key</label>
-      <input id="gaKey" placeholder="e.g. b8568cb9afc64fad861a69edbcbb2647" value="">
-    </div>
-    <div id="traveltimeFields" style="display:none;">
-      <p style="margin-top:8px;">Timetable-exact public transport isochrones. Sign up at <a href="https://account.traveltime.com/signup" target="_blank" rel="noopener">account.traveltime.com/signup</a> (asks for a business name — your own name/project name generally works), then copy your credentials from the dashboard.</p>
-      <label>Application ID</label>
-      <input id="appId" placeholder="e.g. 1a2b3c4d" value="">
-      <label>API key</label>
-      <input id="apiKey" placeholder="e.g. 9f8e7d6c5b4a…" value="">
-    </div>
-    <div class="err" id="apiErr"></div>
-    <div class="actions">
-      <button class="btn" id="useApprox">Use approximate data</button>
-      <button class="btn" id="useShared" style="display:none;">Use shared key</button>
-      <button class="btn primary" id="saveKeys">Connect</button>
-    </div>
+    <div class="panel-footer"><a href="privacy.html">Privacy &amp; accuracy</a></div>
   </div>
 </div>
 
@@ -188,10 +159,11 @@
   Rent data lives in rentdata.js — generated, not hand-edited; regenerate it with
   tools/build-rent-data.py. If it's absent the rent layer falls back to sample
   figures rather than breaking.
-  API keys live in config.js, which is gitignored — see config.example.js
-  for the template and README.md for setup instructions. If config.js is
-  absent (e.g. a fresh clone before you've made your own), the site just
-  falls back to the in-app "API setup" panel instead of erroring.
+  Live travel times come from the isochrone proxy in worker/, whose URL is
+  baked into app.js — visitors never supply a key, and there is no in-app
+  panel to paste one into. config.js is for local development only: it is
+  gitignored, and if it is absent the site falls back to the built-in
+  approximate data rather than erroring. See config.example.js and README.md.
 -->
 <script src="stations.js"></script>
 <script src="stations-mel.js"></script>

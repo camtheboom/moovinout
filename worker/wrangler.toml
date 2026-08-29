@@ -14,7 +14,9 @@ ALLOWED_ORIGINS = ""
 # rejected before it can reach the provider, so leaving it empty is not "allow all": it
 # falls back to the Sydney box built into src/index.js. Adding a city goes here, not in
 # the code. A malformed entry is skipped and the rest still serve.
-SERVED_AREAS = "sydney:-34.30,-33.30,150.30,151.60"
+# Each box has to match that city's bbox in cities.js, or the site will offer
+# destinations the endpoint then refuses.
+SERVED_AREAS = "sydney:-34.30,-33.30,150.30,151.60; melbourne:-38.50,-37.40,144.30,145.60"
 
 # Shared isochrone cache — the thing that keeps a shared key affordable.
 # Create the namespace once with:
@@ -22,7 +24,7 @@ SERVED_AREAS = "sydney:-34.30,-33.30,150.30,151.60"
 # then paste the printed id below.
 [[kv_namespaces]]
 binding = "ISO_CACHE"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "134fdcdd2afe4d1cb2199a0ac16307fb"
 
 # Applied to cache misses only — hits are free, so they aren't metered.
 [[ratelimits]]

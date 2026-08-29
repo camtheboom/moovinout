@@ -26,7 +26,6 @@ h1{font-size:17px; font-weight:700; letter-spacing:-.01em;}
 .datasource.live{background:#e7f6ef; color:#0b6e4f;}
 .datasource.approx{background:#fdf3e3; color:#92600a;}
 .datasource .dot{width:8px; height:8px; border-radius:50%; background:currentColor; flex:none;}
-.datasource button{margin-left:auto; border:0; background:transparent; color:inherit; font-weight:700; font-size:11.5px; cursor:pointer; text-decoration:underline;}
 
 .searchwrap{position:relative; margin-top:12px;}
 #search{
@@ -106,6 +105,12 @@ input[type=range]{flex:1; accent-color:var(--accent);}
 .section h2 .count{color:var(--muted); font-weight:600; letter-spacing:0;}
 
 .hint{font-size:11.5px; color:var(--muted); line-height:1.5; margin-top:14px; padding-top:12px; border-top:1px solid var(--line);}
+
+/* Deliberately the quietest thing in the panel. The disclaimer page is there for
+   anyone who goes looking; it doesn't interrupt anyone who isn't. */
+.panel-footer{font-size:11px; margin-top:10px;}
+.panel-footer a{color:var(--muted); text-decoration:underline; text-underline-offset:2px;}
+.panel-footer a:hover{color:var(--accent);}
 
 .modes{display:flex; flex-wrap:wrap; gap:6px;}
 .modes button{
@@ -226,3 +231,33 @@ input[type=range]{flex:1; accent-color:var(--accent);}
   .collapse-btn{display:block;}
   .panel.min .panel-scroll > *:not(.keep){display:none;}
 }
+
+/* ======================= document pages ======================= */
+/* privacy.html and anything like it: ordinary prose on the site's own type and
+   colour, rather than the full-bleed map shell index.html sets up. */
+body.doc{height:auto; background:#f7f9fb;}
+.page{
+  max-width:640px; margin:0 auto; padding:40px 20px 64px;
+  font-size:14.5px; line-height:1.65; color:var(--ink);
+}
+.page .back{
+  display:inline-block; font-size:12.5px; font-weight:600; color:var(--muted);
+  text-decoration:none; margin-bottom:18px;
+}
+.page .back:hover{color:var(--accent);}
+.page h1{font-size:24px; letter-spacing:-.02em;}
+.page h2{
+  font-size:15px; font-weight:700; color:var(--ink); margin:30px 0 10px;
+  text-transform:none; letter-spacing:normal;
+  padding-top:18px; border-top:1px solid var(--line);
+}
+/* No rule directly under the page title — the heading is separation enough there. */
+.page h2:first-of-type{border-top:0; padding-top:4px; margin-top:18px;}
+.page p{margin-bottom:12px;}
+.page ul{margin:0 0 12px 20px;}
+.page li{margin-bottom:8px;}
+.page code{
+  font-family:ui-monospace,Menlo,monospace; font-size:13px;
+  background:#eef2f6; border-radius:4px; padding:1px 5px;
+}
+.page .updated{margin-top:26px; font-size:12px; color:var(--muted);}

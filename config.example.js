@@ -1,15 +1,19 @@
 // Copy this file to config.js and fill in your own keys.
 // config.js is gitignored so your keys never get committed or pushed.
 //
+// This file is for LOCAL DEVELOPMENT ONLY. Because it is gitignored, it never
+// reaches a deployed copy of the site — what serves visitors is the Worker in
+// worker/, whose URL is baked into DEFAULT_API_BASE in app.js. Visitors are
+// never asked for a key and have no way to supply one; there is no in-app
+// "API setup" panel any more.
+//
 // If you leave config.js out entirely (or leave these blank), Moovin still
-// works — it falls back to the built-in approximate station data, and you
-// can paste a key into the in-app "API setup" panel for that browser tab
-// instead.
+// works — it falls back to the built-in approximate station data.
 
 const MOOVIN_CONFIG = {
-  // Isochrone proxy (worker/) — overrides DEFAULT_API_BASE in index.html for
+  // Isochrone proxy (worker/) — overrides DEFAULT_API_BASE in app.js for
   // local testing, e.g. "http://127.0.0.1:8787". Not a secret: the deployed
-  // value belongs in index.html so it ships with the site.
+  // value belongs in app.js so it ships with the site.
   apiBase: "",
 
   // You only need one provider. If both are filled in, TravelTime wins.

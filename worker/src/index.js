@@ -60,8 +60,8 @@ export default {
       const ip = request.headers.get("CF-Connecting-IP") || "anon";
       const {success} = await env.MISS_LIMIT.limit({key: ip});
       if(!success){
-        return fail(429, "Too many new lookups from this address just now. Wait a moment, " +
-                         "or add your own API key in the app's API setup panel.", cors);
+        return fail(429, "Too many new lookups from this address just now. " +
+                         "Wait a moment and try again.", cors);
       }
     }
 

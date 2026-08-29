@@ -444,7 +444,7 @@ function preferredProvider(){
 // One line under the checkbox saying where the numbers came from. Rent figures are the
 // kind of thing people act on, so the layer never shows a number without its provenance.
 function describeSource(){
-  if(!rentProvider) return "No rent data for " + city.name + " yet — NSW only so far.";
+  if(!rentProvider) return "No rent data for " + city.name + " yet — NSW and VIC so far.";
   if(rentProvider === "domain") return "Domain listings · asking rents";
   if(rentProvider === "nswbonds"){
     return "NSW Fair Trading bonds · " + NSW_RENT_DATA.months + " months to " +

@@ -4,11 +4,14 @@ const BAKED_APP_ID = CFG.travelTimeAppId || "";
 const BAKED_API_KEY = CFG.travelTimeApiKey || "";
 const BAKED_GEOAPIFY_KEY = CFG.geoapifyKey || "";
 
-// Deployed isochrone proxy (worker/). Point this at your Worker and visitors get
-// live data from the site's own key without ever seeing it — this URL is public
-// by design, so unlike the keys above it belongs in the committed file, not in
-// the gitignored config.js. Leave "" for the original bring-your-own-key flow.
-const DEFAULT_API_BASE = "";                       // e.g. "https://moovin-api.you.workers.dev"
+// Deployed isochrone proxy (worker/). This is how visitors get live data: the
+// Worker holds the provider key, so the browser never sees one and is never asked
+// for one. The URL is public by design, so unlike the keys above it belongs in
+// the committed file rather than the gitignored config.js.
+//
+// Left "" the site has no path to live data at all and every visitor gets the
+// built-in approximate bands — so filling this in is the deploy step that matters.
+const DEFAULT_API_BASE = "https://moovin-api.cameron-02e.workers.dev";
 const API_BASE = String(CFG.apiBase || DEFAULT_API_BASE).trim().replace(/\/+$/, "");
 
 const BANDS = [
@@ -26,10 +29,12 @@ const MODE_RADIUS = {train:950, metro:950, lightrail:650, tram:450, ferry:700, b
 const WALK_M_PER_MIN = 80;
 
 // ======================= state =======================
-let creds = {
-  // the proxy wins when configured — it's the path that needs no key from the visitor.
-  // otherwise TravelTime leads: it reads real timetables, so it's the accurate one
-  // when both are baked in. Geoapify stays the fallback.
+// Fixed at boot and never changed afterwards. Visitors don't bring a key and can't
+// be asked for one, so the only question is which of the site's own paths is available:
+// the proxy when it's deployed (the production answer — the key stays on the Worker),
+// otherwise the keys a developer put in their gitignored config.js, TravelTime first
+// because it reads real timetables. With none of them, the built-in data carries the map.
+const creds = {
   provider: API_BASE ? "proxy"
     : ((BAKED_APP_ID && BAKED_API_KEY) ? "traveltime" : "geoapify"),
   appId: BAKED_APP_ID, apiKey: BAKED_API_KEY, gaKey: BAKED_GEOAPIFY_KEY
@@ -128,9 +133,34 @@ const RecenterControl = L.Control.extend({
 });
 L.control.zoom({position:"bottomright"}).addTo(map);
 map.addControl(new RecenterControl());
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a> · isochrones by <a href="https://traveltime.com">TravelTime</a> / <a href="https://www.geoapify.com">Geoapify</a>',
-  subdomains:"abcd", maxZoom:19
+// Basemap. This was CARTO's light_all until CARTO put their tiles behind a key —
+// they didn't start failing, they started returning a valid 200 PNG stamped
+// "API KEY REQUIRED", so it looked like an app error plastered over every tile.
+// Esri's Light Gray Canvas is the keyless equivalent: same job, same muted palette,
+// nothing to sign up for, so a deployed copy can never regress to that state.
+//
+// Real tiles stop at z16; maxNativeZoom lets Leaflet upscale rather than go blank
+// past that, which matters because the zoom control still goes to 19.
+const ESRI_CANVAS = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
+const ESRI_MAX_NATIVE = 16;
+const ATTRIB = 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> — Esri, HERE, Garmin, ' +
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · ' +
+  'isochrones by <a href="https://traveltime.com">TravelTime</a> / ' +
+  '<a href="https://www.geoapify.com">Geoapify</a>';
+
+L.tileLayer(ESRI_CANVAS + "World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+  attribution: ATTRIB, maxZoom: 19, maxNativeZoom: ESRI_MAX_NATIVE
+}).addTo(map);
+
+// Esri ships place names as a separate transparent overlay, which turns out to be an
+// improvement rather than a chore: on its own pane above the overlay pane, suburb
+// labels stay readable *through* the travel-time bands instead of being buried under
+// them. pointerEvents:none keeps click-to-set-destination working across the map.
+map.createPane("labels");
+map.getPane("labels").style.zIndex = 450;
+map.getPane("labels").style.pointerEvents = "none";
+L.tileLayer(ESRI_CANVAS + "World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
+  maxZoom: 19, maxNativeZoom: ESRI_MAX_NATIVE, pane: "labels"
 }).addTo(map);
 
 const isoLayer = L.layerGroup().addTo(map);
@@ -253,11 +283,6 @@ function persistIsoCache(){
   try{ localStorage.removeItem(ISO_KEY); }catch{}
 }
 
-// Credentials changed, so anything cached under them is suspect.
-function clearIsoCache(){
-  isoCache.clear();
-  try{ localStorage.removeItem(ISO_KEY); }catch{}
-}
 
 // ======================= isochrone providers =======================
 function isoCacheKey(arriveSel, levels){
@@ -417,7 +442,12 @@ async function refreshLive(){
     const shapes = await fetchIsochrones();
     renderIsochrones(shapes);
   }catch(err){
-    toast(err.message + " — showing approximate data instead.");
+    // Dropping to the built-in data is the whole point of having it, so an outage,
+    // a quota wall or a flaky network just changes the badge and says nothing. A 4xx
+    // is different: it means this particular request was wrong (a destination outside
+    // the covered area, or too many lookups too fast), which the visitor can act on.
+    console.warn("Live travel-time request failed:", err);
+    if(err.status >= 400 && err.status < 500) toast(err.message);
     setLiveMode(false);
   }finally{
     spinner(false);
@@ -812,77 +842,6 @@ map.on("click", e => {
   ).openOn(map);
 });
 
-// ======================= settings modal =======================
-const overlay = document.getElementById("overlay");
-let modalProvider = creds.provider || "geoapify";
-function showProviderFields(){
-  document.getElementById("geoapifyFields").style.display = modalProvider === "geoapify" ? "block" : "none";
-  document.getElementById("traveltimeFields").style.display = modalProvider === "traveltime" ? "block" : "none";
-  for(const b of document.querySelectorAll("#providerTabs button"))
-    b.classList.toggle("on", b.dataset.p === modalProvider);
-}
-document.getElementById("providerTabs").addEventListener("click", e => {
-  const btn = e.target.closest("button"); if(!btn) return;
-  modalProvider = btn.dataset.p;
-  document.getElementById("apiErr").style.display = "none";
-  showProviderFields();
-});
-document.getElementById("openSettings").addEventListener("click", () => {
-  document.getElementById("appId").value = creds.appId || "";
-  document.getElementById("apiKey").value = creds.apiKey || "";
-  document.getElementById("gaKey").value = creds.gaKey || "";
-  modalProvider = creds.provider || "geoapify";
-  showProviderFields();
-  overlay.classList.add("show");
-});
-document.getElementById("useApprox").addEventListener("click", () => {
-  overlay.classList.remove("show");
-  setLiveMode(false);
-});
-document.getElementById("useShared").addEventListener("click", async () => {
-  creds = {...creds, provider: "proxy"};
-  clearIsoCache();
-  overlay.classList.remove("show");
-  liveMode = true;
-  await refreshLive();
-  if(liveMode) setLiveMode(true);      // refreshLive turns it back off if the call failed
-});
-document.getElementById("saveKeys").addEventListener("click", async () => {
-  const appId = document.getElementById("appId").value.trim();
-  const apiKey = document.getElementById("apiKey").value.trim();
-  const gaKey = document.getElementById("gaKey").value.trim();
-  const errEl = document.getElementById("apiErr");
-  errEl.style.display = "none";
-  if(modalProvider === "traveltime" && (!appId || !apiKey)){
-    errEl.textContent = "Please enter both the Application ID and the API key.";
-    errEl.style.display = "block"; return;
-  }
-  if(modalProvider === "geoapify" && !gaKey){
-    errEl.textContent = "Please enter your Geoapify API key.";
-    errEl.style.display = "block"; return;
-  }
-  creds = {provider: modalProvider, appId, apiKey, gaKey};
-  clearIsoCache();
-  // validate with a real request
-  const btn = document.getElementById("saveKeys");
-  btn.disabled = true; btn.textContent = "Checking…";
-  try{
-    liveMode = true;
-    const shapes = await fetchIsochrones();
-    renderIsochrones(shapes);
-    setLiveMode(true);
-    overlay.classList.remove("show");
-    toast("Connected — showing live " + (creds.provider === "geoapify" ? "Geoapify" : "TravelTime") + " isochrones.");
-  }catch(err){
-    liveMode = false;
-    errEl.textContent = err.message;
-    errEl.style.display = "block";
-  }finally{
-    btn.disabled = false; btn.textContent = "Connect";
-  }
-});
-overlay.addEventListener("click", e => { if(e.target === overlay) overlay.classList.remove("show"); });
-
 // mobile collapse
 document.getElementById("collapseBtn").addEventListener("click", () => {
   const p = document.getElementById("panel");
@@ -982,12 +941,10 @@ map.addLayer(stationLayer);
 document.getElementById("showStations").checked = true;
 renderStations();
 renderSaved();
-if(API_BASE){
-  document.getElementById("sharedNote").style.display = "block";
-  document.getElementById("useShared").style.display = "inline-block";
-}
+// Live data is opt-out, not opt-in: if the site has a path to it, take it without
+// asking. refreshLive drops back to approximate data on its own if the call fails,
+// so the flag is re-checked rather than trusted.
 if(API_BASE || (BAKED_APP_ID && BAKED_API_KEY) || BAKED_GEOAPIFY_KEY){
   liveMode = true;
-  // guard the flag: refreshLive drops to approximate data if the first call fails
   refreshLive().then(() => { if(liveMode) setLiveMode(true); });
 }

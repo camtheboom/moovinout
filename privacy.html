@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy &amp; accuracy — Moovin</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23e5484d'/%3E%3Ccircle cx='32' cy='32' r='20.5' fill='%23f59e0b'/%3E%3Ccircle cx='32' cy='32' r='11' fill='%231a9850'/%3E%3Ccircle cx='32' cy='32' r='3.5' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="doc">
+<main class="page">
+  <a class="back" href="index.html">← Back to the map</a>
+  <h1>Privacy &amp; accuracy</h1>
+
+  <h2>What this site does with your data</h2>
+
+  <p>There are no accounts and no sign-up. Nothing you do here is tied to an identity, because there is no identity to tie it to.</p>
+
+  <p><strong>Saved spots stay in your browser.</strong> They're kept in local storage on your own device and are never sent to a server — which also means they don't follow you to another browser or another machine, and clearing your browser data deletes them. The travel-time shapes the map has already drawn are cached the same way, so a reload doesn't have to fetch them again.</p>
+
+  <p><strong>Shareable links don't reach us either.</strong> The destination, time budget and arrival time in a shared link sit after the <code>#</code> in the URL. Browsers never transmit that part of a URL to a server, so what you're searching for stays on your device even when the link travels.</p>
+
+  <p><strong>Third parties the map depends on.</strong> Making the map work means your browser talks to a few services directly, and each of them necessarily sees your IP address and roughly what you're looking at:</p>
+
+  <ul>
+    <li><strong>Map tiles</strong> come from Esri, built on OpenStreetMap and other licensed data.</li>
+    <li><strong>Travel-time calculations</strong> are computed by Geoapify, reached through our proxy below rather than by your browser directly.</li>
+    <li><strong>Our own proxy</strong> (a Cloudflare Worker) sits in front of Geoapify and calls it with our key, not yours — there is nothing for you to supply, and no key of yours is ever asked for or held. It briefly processes your IP address to rate-limit abuse — it isn't logged alongside your searches — and it caches results against coordinates rounded to roughly a 300 m grid, so repeat lookups near the same place are answered without another call. Those cached entries are locations, not people.</li>
+  </ul>
+
+  <p>No ads, no analytics, no tracking pixels. Nothing is sold or shared beyond what's listed above, which is only what's needed to draw the map.</p>
+
+  <h2>Accuracy</h2>
+
+  <p><strong>Travel times here are estimates.</strong> They come from public timetable data and third-party routing services, not from live official feeds. They don't know about a cancelled service, trackwork, a delay this morning, or the walk from the platform to your actual front door.</p>
+
+  <p>The same caution applies to the rent figures: they're medians from lodged rental bonds covering a rolling window of past tenancies, so they describe what people recently agreed to pay in an area, not what's on the market today.</p>
+
+  <p>Moovin is an independent project and is <strong>not affiliated with, endorsed by, or connected to</strong> Transport for NSW, Public Transport Victoria, Geoapify, TravelTime, or Domain.</p>
+
+  <p>Treat everything on this map as a first pass for narrowing down where to look. <strong>Before you act on it — signing a lease especially — check the commute through an official trip planner</strong> at the times you'd really be travelling.</p>
+
+  <p class="updated">Last updated 22 August 2026.</p>
+</main>
+</body>
+</html>
