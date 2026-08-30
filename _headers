@@ -1,0 +1,29 @@
+# Security headers for Cloudflare Pages.
+#
+# Pages reads this file at deploy time and applies it to matching paths. It is a
+# Pages/Netlify convention — GitHub Pages ignores it entirely and offers no way to set
+# headers, which is one reason to prefer Pages as the host.
+#
+# The CSP is only this tight because no inline script survives in the site: the popup
+# buttons carry their arguments in data-* attributes and are dispatched by one delegated
+# listener in app.js. Adding an onclick="" anywhere would force 'unsafe-inline' back into
+# script-src and give most of this away, so don't.
+#
+# Every host below has to be here for a reason:
+#   cdnjs.cloudflare.com   Leaflet, pinned by SRI in index.html
+#   *.workers.dev          the isochrone proxy in worker/ — must match DEFAULT_API_BASE
+#                          in app.js, so change both together
+#   server.arcgisonline.com  Esri basemap and label tiles
+#
+# style-src keeps 'unsafe-inline' because markers, legend swatches and popups set colours
+# through style="" attributes. That is a much smaller concession than script-src would be:
+# it cannot execute anything.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://server.arcgisonline.com; connect-src 'self' https://moovin-api.cameron-02e.workers.dev; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains

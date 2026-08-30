@@ -58,7 +58,12 @@ This is the **local development** path. To set up a deployment that serves visit
      geoapifyKey: "",
    };
    ```
-4. Open `index.html` in a browser. If your browser blocks `fetch` requests from a plain `file://` page, serve the folder locally instead:
+4. Uncomment the `config.js` script tag in `index.html` — it ships commented out, because `config.js` is gitignored and never deployed, so on a live host the tag would be a guaranteed 404 on every page load:
+   ```html
+   <script src="config.js"></script>
+   ```
+   Leave it commented if you only want the built-in approximate data. **Re-comment it before deploying.**
+5. Open `index.html` in a browser. If your browser blocks `fetch` requests from a plain `file://` page, serve the folder locally instead:
    ```
    python3 -m http.server 8000
    ```
@@ -68,7 +73,13 @@ No `config.js`? The site still works — it just runs on the built-in approximat
 
 ## Deploying
 
-This is a static site — `index.html`, `privacy.html`, `styles.css`, `app.js`, `cities.js`, the station files (`stations.js`, `stations-mel.js`), the rent files (`rentdata.js`, `rentdata-vic.js`), `rentals.js`, plus your local `config.js`. GitHub Pages, Netlify, Vercel, or any static host all work with zero build step.
+This is a static site — `index.html`, `privacy.html`, `styles.css`, `app.js`, `cities.js`, the station files (`stations.js`, `stations-mel.js`), the rent files (`rentdata.js`, `rentdata-vic.js`), `rentals.js`, and `_headers`. GitHub Pages, Netlify, Vercel, or any static host all work with zero build step. Do **not** upload `config.js`.
+
+**Prefer Cloudflare Pages, and deploy it from Git rather than by uploading a folder.** Two reasons, both about not leaking your key: a Git-connected deploy physically cannot pick up `config.js` (it's gitignored), whereas `wrangler pages deploy .` from your working copy would upload it. And `_headers` — the site's Content-Security-Policy and other security headers — is honoured by Pages and Netlify, but **silently ignored by GitHub Pages**, which offers no way to set response headers at all.
+
+The CSP in `_headers` names every origin the site is allowed to talk to, so it has to be kept in step with the code: if you change `DEFAULT_API_BASE` in `app.js` (a custom domain for the Worker, say), change `connect-src` in `_headers` to match, or the browser will block the call and every visitor will silently drop to approximate data. Same for swapping the basemap (`img-src`) or the CDN Leaflet comes from (`script-src`).
+
+The policy is also the reason the popup buttons carry their arguments in `data-*` attributes and are dispatched by one delegated listener in `app.js`, rather than using inline `onclick`. Adding an inline handler anywhere would mean putting `'unsafe-inline'` back into `script-src`, which gives away most of what the policy buys.
 
 Note: `config.js` is gitignored on purpose, so a public deployment won't have your key baked in. **A static deployment on its own therefore serves approximate data to everyone** — deploying the Worker below is what makes it live. Don't work around this by committing a real key: anything in a static page is readable by anyone who opens devtools, and a harvested key gets spent.
 

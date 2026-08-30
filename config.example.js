@@ -1,6 +1,10 @@
 // Copy this file to config.js and fill in your own keys.
 // config.js is gitignored so your keys never get committed or pushed.
 //
+// You also have to uncomment the config.js <script> tag in index.html — it ships
+// commented out so that a deployed copy, which will never have this file, doesn't 404
+// on every page load. Re-comment it before you deploy.
+//
 // This file is for LOCAL DEVELOPMENT ONLY. Because it is gitignored, it never
 // reaches a deployed copy of the site — what serves visitors is the Worker in
 // worker/, whose URL is baked into DEFAULT_API_BASE in app.js. Visitors are

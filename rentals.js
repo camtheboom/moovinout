@@ -378,10 +378,16 @@ function rentPopupHtml(area){
       'flat and house medians — Victoria publishes only the two crossed.</div>'
     : "";
 
+  // The button's arguments go in data-* attributes, dispatched by the delegated handler
+  // in app.js. The previous form interpolated the name into a JS string literal inside an
+  // HTML attribute, which is one escaping layer too many to get right: escapeHtml turns a
+  // quote in a suburb name into &quot;, the HTML parser turns that back into a quote, and
+  // it lands inside the JS string already escaped past. Reachable on the Domain path,
+  // where names come from an API response rather than the bundled files.
   return '<div class="pn">' + title + (area.postcode ? " " + area.postcode : "") + "</div>" +
          note + '<div class="rtable">' + combined + rows.join("") + "</div>" + derivedNote +
-         '<button class="setdest" onclick="setDestination(' + area.lat + "," + area.lon +
-         ',&quot;' + title.replace(/"/g, "") + '&quot;)">Set as destination</button>';
+         '<button class="setdest" data-act="setdest" data-lat="' + area.lat +
+         '" data-lon="' + area.lon + '" data-name="' + title + '">Set as destination</button>';
 }
 
 function renderRentals(){

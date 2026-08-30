@@ -168,7 +168,14 @@
 <script src="stations.js"></script>
 <script src="stations-mel.js"></script>
 <script src="cities.js"></script>
+<!-- Local development only: uncomment to load your gitignored config.js. It stays
+     commented in the committed file because config.js is never deployed, so on a live
+     host the tag is a guaranteed 404 that the browser then refuses to execute (nosniff
+     blocks the 404 page's text/html body) — a red console error on every page load,
+     announcing a config file that was never meant to be there. app.js and rentals.js
+     both guard on typeof MOOVIN_CONFIG, so absent is a supported state, not a broken one.
 <script src="config.js"></script>
+-->
 <script src="app.js"></script>
 <script src="rentdata.js"></script>
 <script src="rentdata-vic.js"></script>
