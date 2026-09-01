@@ -14,13 +14,17 @@
 #   *.workers.dev          the isochrone proxy in worker/ — must match DEFAULT_API_BASE
 #                          in app.js, so change both together
 #   server.arcgisonline.com  Esri basemap and label tiles
+#   static.cloudflareinsights.com  the Cloudflare Web Analytics beacon script
+#   cloudflareinsights.com   where that beacon POSTs its page views (connect-src) —
+#                          both hosts pair with the <script> tag at the foot of
+#                          index.html and privacy.html, so change them together
 #
 # style-src keeps 'unsafe-inline' because markers, legend swatches and popups set colours
 # through style="" attributes. That is a much smaller concession than script-src would be:
 # it cannot execute anything.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://server.arcgisonline.com; connect-src 'self' https://moovin-api.cameron-02e.workers.dev; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://server.arcgisonline.com; connect-src 'self' https://moovin-api.cameron-02e.workers.dev https://cloudflareinsights.com; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY

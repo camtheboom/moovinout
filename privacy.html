@@ -25,10 +25,11 @@
   <ul>
     <li><strong>Map tiles</strong> come from Esri, built on OpenStreetMap and other licensed data.</li>
     <li><strong>Travel-time calculations</strong> are computed by Geoapify, reached through our proxy below rather than by your browser directly.</li>
+    <li><strong>Visit counts</strong> are measured by Cloudflare Web Analytics. It sets no cookies, stores nothing on your device, and doesn't fingerprint your browser or follow you to other sites. It records the page you loaded, the referring site, and coarse details such as country, browser and whether you were on mobile — an aggregate of visits, not a profile of you. Cloudflare processes your IP address to do that but doesn't retain it for us, and we only ever see the totals.</li>
     <li><strong>Our own proxy</strong> (a Cloudflare Worker) sits in front of Geoapify and calls it with our key, not yours — there is nothing for you to supply, and no key of yours is ever asked for or held. It briefly processes your IP address to rate-limit abuse — it isn't logged alongside your searches — and it caches results against coordinates rounded to roughly a 300 m grid, so repeat lookups near the same place are answered without another call. Those cached entries are locations, not people.</li>
   </ul>
 
-  <p>No ads, no analytics, no tracking pixels. Nothing is sold or shared beyond what's listed above, which is only what's needed to draw the map.</p>
+  <p>No ads, no tracking pixels, no cookies, and no accounts. The only analytics are the privacy-preserving visit counts described above — they tell us how many people the map reached, not who they were. Nothing is sold or shared beyond what's listed above.</p>
 
   <h2>Accuracy</h2>
 
@@ -40,7 +41,12 @@
 
   <p>Treat everything on this map as a first pass for narrowing down where to look. <strong>Before you act on it — signing a lease especially — check the commute through an official trip planner</strong> at the times you'd really be travelling.</p>
 
-  <p class="updated">Last updated 22 August 2026.</p>
+  <p class="updated">Last updated 2 September 2026.</p>
 </main>
+<!-- Cloudflare Web Analytics. Loaded from static.cloudflareinsights.com and reports to
+     cloudflareinsights.com, so both hosts are in the CSP in _headers — change them together.
+     Cookieless and no fingerprinting; the privacy page describes it. -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "2161a1ffc97048a58a361afc43ab0355"}'></script>
+<!-- End Cloudflare Web Analytics -->
 </body>
 </html>
